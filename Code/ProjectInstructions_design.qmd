@@ -97,7 +97,7 @@ Multicollinearity (since we are treating Pressure & pH as numeric) were checked 
 # Results  
 Here is where the coding is going to happen, and it will be completely up to you. Include under this section as many sub-sections (using ##) and as many chunks needed to create the analytical workflow for your analysis, starting at loading packages and data, wrangling, EDA, modeling, assumptions checking, ANOVA table, means, pairwise comparisons, and final publication-quality plot.
 
-#Loading Required Packages
+##Loading Required Packages
 
 ```{r}
 # Load all required libraries
@@ -106,14 +106,99 @@ library(car)           # For Anova (Type III)
 library(emmeans)       # For estimated marginal means and pairwise comparisons
 library(ggpubr)        # For publication-ready plots
 library(readxl)
+library(dplyr)
 
 ```
 
-#Load and Inspect Data
+##Load and Inspect Data
 
 ```{r}
-data <- read_excel("../Data/FinalData_MD.xlsx")
+ hpp_data<- read_excel("../Data/Data_MD.xlsx")
+
+View(hpp_data)
 ```
+
+## Convert necessary columns to factors
+
+```{r}
+Data <- hpp_data %>%
+  mutate(
+    Organism = as.factor(Organism),
+    Pressure = as.factor(Pressure),
+    pH = as.factor(pH),
+    Acid = as.factor(Acid)
+  )
+
+```
+
+```{r}
+glimpse(Data)
+```
+
+```{r}
+Data %>%
+  group_by(Organism, Pressure, pH, Acid) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  arrange(desc(n)) %>%
+  head(10) %>%
+```
+
+
+```{r}
+Data %>%
+  summarise(
+    mean_D = mean(Response, na.rm = TRUE),
+    sd_D = sd(Response, na.rm = TRUE),
+    min_D = min(Response, na.rm = TRUE),
+    max_D = max(Response, na.rm = TRUE),
+    n = n()
+  )
+```
+
+##Exploratory Data Analysis (EDA)
+
+```{r}
+# Boxplot of D-values by each factor
+ggplot(Data, aes(x = Organism, y = Response, fill = Organism)) +
+  geom_boxplot() +
+  facet_grid(Acid ~ Pressure + pH) +
+  theme_minimal() +
+  labs(title = "Distribution of D-values by Organism, pH, Pressure, and Acid")
+
+# Check interaction effects visually
+interaction.plot(Data$Pressure, Data$Organism, Data$Response,
+                 col = c("red", "blue"), lwd = 2,
+                 xlab = "Pressure", ylab = "Response", trace.label = "Organism")
+
+```
+##Full Factorial Design model
+
+```{r}
+# Full factorial ANOVA model
+model <- aov(Response ~ Organism * Pressure * pH * Acid, data = Data)
+summary(model)
+
+# If Type III SS is required
+model_lm <- lm(Response ~ Organism * Pressure * pH * Acid, data = Data)
+Anova(model_lm, type = "III")
+
+```
+
+##Model Assumptions
+
+```{r}
+# Residuals vs Fitted
+plot(model_lm, which = 1)
+
+# Q-Q plot for normality
+plot(model_lm, which = 2)
+
+# Check homogeneity of variance
+leveneTest(Response ~ Organism * Pressure * pH * Acid, data = Data)
+
+```
+
+
 
 Make sure to run a model that reflects your study design. Even if your study design does not include one of the designs covered in class, you are still expected to run the most appropriate model. If you need help for references, let me know.  
 
