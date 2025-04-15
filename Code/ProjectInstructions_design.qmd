@@ -107,7 +107,6 @@ library(emmeans)       # For estimated marginal means and pairwise comparisons
 library(ggpubr)        # For publication-ready plots
 library(readxl)
 library(dplyr)
-
 ```
 
 ##Load and Inspect Data
@@ -158,29 +157,67 @@ Data %>%
 ##Exploratory Data Analysis (EDA)
 
 ```{r}
-# Boxplot of D-values by each factor
-ggplot(Data, aes(x = Organism, y = Response, fill = Organism)) +
+# D-values by Organism (vertical)
+ ggplot(Data, aes(x = Organism, y = Response, fill = Organism)) +
   geom_boxplot() +
-  facet_grid(Acid ~ Pressure + pH) +
   theme_minimal() +
-  labs(title = "Distribution of D-values by Organism, pH, Pressure, and Acid")
+  labs(title = "D-values by Organism", y = "Response", x = "Organism") +
+  theme(legend.position = "none")
 
-# Check interaction effects visually
-interaction.plot(Data$Pressure, Data$Organism, Data$Response,
-                 col = c("red", "blue"), lwd = 2,
-                 xlab = "Pressure", ylab = "Response", trace.label = "Organism")
+# D-values by Pressure
+ggplot(Data, aes(x = Pressure, y = Response, fill = Pressure)) +
+  geom_boxplot() +
+  theme_minimal() +
+  labs(title = "D-values by Pressure", y = "Response", x = "Pressure (MPa)") +
+  theme(legend.position = "none")
+
+# D-values by pH
+ggplot(Data, aes(x = pH, y = Response, fill = pH)) +
+  geom_boxplot() +
+  theme_minimal() +
+  labs(title = "D-values by pH", y = "Response", x = "pH") +
+  theme(legend.position = "none")
+
+# D-values by Acid Type
+ ggplot(Data, aes(x = Acid, y = Response, fill = Acid)) +
+  geom_boxplot() +
+  theme_minimal() +
+  labs(title = "D-values by Acid Type", y = "Response", x = "Acid Type") +
+  theme(legend.position = "none")
+ 
+ # Create the boxplot showing the effect of Acid Type on Organism
+ggplot(Data, aes(x = Acid, y = Response, fill = Organism)) +
+  geom_boxplot() +
+  theme_minimal() +
+  labs(
+    title = "Effect of Acid Type on D-values by Organism",
+    y = "D-value (Response)",
+    x = "Acid Type"
+  ) +
+  theme(legend.position = "top")  # Adjust legend position to the top
 
 ```
-##Full Factorial Design model
 
 ```{r}
-# Full factorial ANOVA model
-model <- aov(Response ~ Organism * Pressure * pH * Acid, data = Data)
-summary(model)
+hpp <- Data %>%
+  pivot_longer(cols = c(Pressure, pH, Acid),
+               names_to = "Factor",
+               values_to = "Level")
 
-# If Type III SS is required
-model_lm <- lm(Response ~ Organism * Pressure * pH * Acid, data = Data)
-Anova(model_lm, type = "III")
+# Make sure Level is a factor for proper ordering in boxplot
+hpp$Level <- as.factor(hpp$Level)
+```
+
+```{r}
+# Boxplot showing effect of Acid Type on Organism
+ggplot(Data, aes(x = Acid, y = Response, fill = Organism)) +
+  geom_boxplot() +
+  facet_wrap(~ Organism, scales = "free_x") +  # Faceting by Organism
+  theme_minimal() +
+  labs(title = "Effect of Acid Type on D-values by Organism",
+       x = "Acid Type", y = "Response") +
+  theme(legend.position = "top")  # Adjust legend position for clarity
+
 
 ```
 
@@ -197,7 +234,65 @@ plot(model_lm, which = 2)
 leveneTest(Response ~ Organism * Pressure * pH * Acid, data = Data)
 
 ```
+##ANOVA
 
+```{r}
+# Fit the ANOVA model
+anova_model <- aov(Response ~ Pressure * Acid * pH, data = Data)
+
+anova_model
+```
+
+## EMMeans & Pairwise Comparisons
+
+```{r}
+
+# Main effects EMMs
+
+emm <- emmeans(model, ~ Pressure * Acid * pH)
+
+emm
+
+
+# Pairwise comparisons using Tukey HSD
+pairwise_comparisons <- emmeans(anova_model, pairwise ~ Pressure * Acid *pH, adjust = "tukey")
+
+# Display the pairwise comparisons result
+summary(pairwise_comparisons)
+
+
+```
+##Weibull model fitting
+
+
+
+##Plots
+
+```{r}
+# Estimated marginal means plot for Pressure
+model <- aov(Response ~ Pressure * pH * Acid * Organism, data = Data)
+
+emm_all <- bind_rows(
+  as.data.frame(emmeans(model, ~ Pressure)) %>% mutate(Factor = "Pressure", Level = as.character(Pressure)),
+  as.data.frame(emmeans(model, ~ pH)) %>% mutate(Factor = "pH", Level = as.character(pH)),
+  as.data.frame(emmeans(model, ~ Acid)) %>% mutate(Factor = "Acid", Level = as.character(Acid)),
+  as.data.frame(emmeans(model, ~ Organism)) %>% mutate(Factor = "Organism", Level = as.character(Organism))
+)
+
+ggplot(emm_all, aes(x = Level, y = emmean, fill = Factor)) +
+  geom_col(position = position_dodge(width = 0.9), width = 0.6, show.legend = FALSE) +
+  geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), width = 0.2) +
+  facet_wrap(~ Factor, scales = "free_x") +
+  labs(
+    title = "Estimated Marginal Means of D-values",
+    x = "Factor Levels",
+    y = "Estimated Mean D-value"
+  ) +
+  theme_minimal(base_size = 13)
+
+
+
+```
 
 
 Make sure to run a model that reflects your study design. Even if your study design does not include one of the designs covered in class, you are still expected to run the most appropriate model. If you need help for references, let me know.  
