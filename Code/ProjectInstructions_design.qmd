@@ -100,13 +100,16 @@ Here is where the coding is going to happen, and it will be completely up to you
 ##Loading Required Packages
 
 ```{r}
-# Load all required libraries
-library(tidyverse)     # For data wrangling and plotting
-library(car)           # For Anova (Type III)
+install.packages(minpack.lm)
+library(minpack.lm)
+library(readxl) # for loading data
+library(tidyverse)     # For data manipulation and visualization
+library(ggplot2)       # For plotting (also in tidyverse)
+library(car)           # For ANOVA assumption checks
 library(emmeans)       # For estimated marginal means and pairwise comparisons
-library(ggpubr)        # For publication-ready plots
-library(readxl)
-library(dplyr)
+library(readr)         # For reading in CSV files
+library(broom)         # For tidying model outputs
+library(ggpubr)        # For  plots
 ```
 
 ##Load and Inspect Data
@@ -115,130 +118,166 @@ library(dplyr)
  hpp_data<- read_excel("../Data/Data_MD.xlsx")
 
 View(hpp_data)
+glimpse (hpp_data)
 ```
 
 ## Convert necessary columns to factors
 
 ```{r}
-Data <- hpp_data %>%
+data <- hpp_data %>%
+  
   mutate(
-    Organism = as.factor(Organism),
-    Pressure = as.factor(Pressure),
-    pH = as.factor(pH),
-    Acid = as.factor(Acid)
+    Organism = factor(Organism),
+    Pressure = factor(Pressure),
+    pH = factor(pH),
+    Acid = factor(Acid),
+    Rep = factor(Rep) # Replicates as a factor
   )
+# Check for any missing values
+sum(is.na(data))
 
+# Preview cleaned data
+head(data)
 ```
 
 ```{r}
-glimpse(Data)
+glimpse(data)
 ```
 
+##summary
+
 ```{r}
-Data %>%
+data %>%
   group_by(Organism, Pressure, pH, Acid) %>%
-  summarise(n = n(), .groups = "drop") %>%
-  arrange(desc(n)) %>%
-  head(10) %>%
-```
-
-
-```{r}
-Data %>%
   summarise(
     mean_D = mean(Response, na.rm = TRUE),
     sd_D = sd(Response, na.rm = TRUE),
-    min_D = min(Response, na.rm = TRUE),
-    max_D = max(Response, na.rm = TRUE),
     n = n()
-  )
+  ) %>%
+  arrange(desc(mean_D))
 ```
-
-##Exploratory Data Analysis (EDA)
+#Boxplots to visualize distribution of Response
 
 ```{r}
-# D-values by Organism (vertical)
- ggplot(Data, aes(x = Organism, y = Response, fill = Organism)) +
+ggplot(data, aes(x = Organism, y = Response, fill = Organism)) +
   geom_boxplot() +
-  theme_minimal() +
-  labs(title = "D-values by Organism", y = "Response", x = "Organism") +
-  theme(legend.position = "none")
+  labs(title = "D-values by Organism") +
+  theme_minimal()
 
 # D-values by Pressure
-ggplot(Data, aes(x = Pressure, y = Response, fill = Pressure)) +
+
+ggplot(data, aes(x = Pressure, y = Response, fill = Pressure)) +
   geom_boxplot() +
-  theme_minimal() +
-  labs(title = "D-values by Pressure", y = "Response", x = "Pressure (MPa)") +
-  theme(legend.position = "none")
+  labs(title = "D-values by Pressure") +
+  theme_minimal()
 
 # D-values by pH
-ggplot(Data, aes(x = pH, y = Response, fill = pH)) +
+ggplot(data, aes(x = pH, y = Response, fill = pH)) +
   geom_boxplot() +
-  theme_minimal() +
-  labs(title = "D-values by pH", y = "Response", x = "pH") +
-  theme(legend.position = "none")
+  labs(title = "D-values by pH") +
+  theme_minimal()
 
-# D-values by Acid Type
- ggplot(Data, aes(x = Acid, y = Response, fill = Acid)) +
+# D-values by Acid
+ggplot(data, aes(x = Acid, y = Response, fill = Acid)) +
   geom_boxplot() +
-  theme_minimal() +
-  labs(title = "D-values by Acid Type", y = "Response", x = "Acid Type") +
-  theme(legend.position = "none")
- 
- # Create the boxplot showing the effect of Acid Type on Organism
-ggplot(Data, aes(x = Acid, y = Response, fill = Organism)) +
-  geom_boxplot() +
-  theme_minimal() +
-  labs(
-    title = "Effect of Acid Type on D-values by Organism",
-    y = "D-value (Response)",
-    x = "Acid Type"
-  ) +
-  theme(legend.position = "top")  # Adjust legend position to the top
+  labs(title = "D-values by Acid") +
+  theme_minimal()
+
 
 ```
 
+##Pivot data longer to use facets
 ```{r}
-hpp <- Data %>%
-  pivot_longer(cols = c(Pressure, pH, Acid),
+data_long <- data %>%
+  pivot_longer(cols = c(Organism, Pressure, pH, Acid),
                names_to = "Factor",
                values_to = "Level")
 
-# Make sure Level is a factor for proper ordering in boxplot
-hpp$Level <- as.factor(hpp$Level)
-```
-
-```{r}
-# Boxplot showing effect of Acid Type on Organism
-ggplot(Data, aes(x = Acid, y = Response, fill = Organism)) +
+# Create a faceted boxplot
+ggplot(data_long, aes(x = Level, y = Response, fill = Level)) +
   geom_boxplot() +
-  facet_wrap(~ Organism, scales = "free_x") +  # Faceting by Organism
+  facet_wrap(~ Factor, scales = "free_x") +
+  labs(title = "D-values by Experimental Factors",
+       x = "Factor Levels", y = "Response") +
   theme_minimal() +
-  labs(title = "Effect of Acid Type on D-values by Organism",
-       x = "Acid Type", y = "Response") +
-  theme(legend.position = "top")  # Adjust legend position for clarity
-
-
+  theme(legend.position = "none")
 ```
 
-##Model Assumptions
 
 ```{r}
-# Residuals vs Fitted
-plot(model_lm, which = 1)
+# Create a combined factor for all conditions
+data <- data %>%
+  mutate(Combo = interaction(Organism, Pressure, pH, Acid, sep = "_"))
 
-# Q-Q plot for normality
-plot(model_lm, which = 2)
-
-# Check homogeneity of variance
-leveneTest(Response ~ Organism * Pressure * pH * Acid, data = Data)
+# Plot
+ggplot(data, aes(x = Combo, y = Response, fill = Organism)) +
+  geom_boxplot() +
+  labs(title = "D-values by Combined Experimental Conditions",
+       x = "Experimental Condition",
+       y = "Response") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
 
 ```
+
+##Primary Model fiting
+```{r}
+# Linear model with all main effects
+lm_model <- lm(Response ~ Organism + Pressure + pH + Acid, data = data)
+
+lm_model
+# Summary of linear model
+summary(lm_model)
+```
+
+#Weibull model fitting
+```{r}
+data_model <- data %>%
+  filter(!is.na(Response), Response > 0) %>%
+  # Convert Pressure to numeric
+  mutate(
+    Pressure_numeric = as.numeric(as.character(Pressure))  
+  )
+# Fit Weibull inactivation model
+weibull_model <- nlsLM(
+  Response ~ a * exp(- (Pressure_numeric / b)^c),
+  data = data_model,
+  start = list(a = 5, b = 600, c = 1.5),  # Try adjusting these if it doesn't converge
+  control = nls.control(maxiter = 200, warnOnly = TRUE)
+)
+
+summary(weibull_model)
+
+
+# Add predicted values
+data_model$Weibull_fit <- predict(weibull_model)
+
+# Plot observed vs Weibull fit
+ggplot(data_model, aes(x = Pressure_numeric, y = Response)) +
+  geom_point(color = "blue") +
+  geom_line(aes(y = Weibull_fit), color = "red", size = 1) +
+  labs(title = "Weibull Model Fit",
+       x = "Pressure (MPa)",
+       y = "Response") +
+  theme_minimal()
+
+```
+
+##Akaike Information Criterion
+
+```{r}
+aic_results <- AIC(lm_model, weibull_model)
+
+aic_results
+```
+
+
+
 ##ANOVA
 
 ```{r}
 # Fit the ANOVA model
-anova_model <- aov(Response ~ Pressure * Acid * pH, data = Data)
+anova_model <- aov(Response ~ Pressure * Acid * pH * Organism, data = data)
 
 anova_model
 ```
@@ -249,7 +288,7 @@ anova_model
 
 # Main effects EMMs
 
-emm <- emmeans(model, ~ Pressure * Acid * pH)
+emm <- emmeans(lm_model, ~ Pressure * Acid * pH )
 
 emm
 
@@ -262,7 +301,6 @@ summary(pairwise_comparisons)
 
 
 ```
-##Weibull model fitting
 
 
 
@@ -294,7 +332,19 @@ ggplot(emm_all, aes(x = Level, y = emmean, fill = Factor)) +
 
 ```
 
+##Modeling
 
+```{r}
+
+
+# Weibull model (non-linear)
+weibull_model <- nlsLM(
+  Response ~ a * exp(- (Pressure / b)^c),
+  data = data,
+  start = list(a = 3, b = 600, c = 0.5)
+)
+
+```
 Make sure to run a model that reflects your study design. Even if your study design does not include one of the designs covered in class, you are still expected to run the most appropriate model. If you need help for references, let me know.  
 
 Before each chunk, describe the steps being performed in that chunk. For example, "Here I will load the data".  
