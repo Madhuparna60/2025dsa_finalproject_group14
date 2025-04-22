@@ -97,11 +97,9 @@ Multicollinearity (since we are treating Pressure & pH as numeric) were checked 
 # Results  
 Here is where the coding is going to happen, and it will be completely up to you. Include under this section as many sub-sections (using ##) and as many chunks needed to create the analytical workflow for your analysis, starting at loading packages and data, wrangling, EDA, modeling, assumptions checking, ANOVA table, means, pairwise comparisons, and final publication-quality plot.
 
-##Loading Required Packages
+## (a)Loading Required Packages
 
 ```{r}
-install.packages(minpack.lm)
-library(minpack.lm)
 library(readxl) # for loading data
 library(tidyverse)     # For data manipulation and visualization
 library(ggplot2)       # For plotting (also in tidyverse)
@@ -110,32 +108,36 @@ library(emmeans)       # For estimated marginal means and pairwise comparisons
 library(readr)         # For reading in CSV files
 library(broom)         # For tidying model outputs
 library(ggpubr)        # For  plots
+install.packages("multcompView")
+
+library(multcompView)
+
 ```
 
-## (a) Load and Inspect Data
+## (b) Load and Inspect Data
 
 ```{r}
  hpp_data<- read_excel("../Data/Data_MD.xlsx")
 
-View(hpp_data)
+hpp_data
 
 ```
-## (b) EDA tables
+## (c) EDA tables
 
-```{r}
+```{r summary}
 summary(hpp_data)
 ```
 
-```{r}
+```{r glimpse}
 glimpse(hpp_data)
 ```
 
-## (c) Data Wrangling
+## (d) Data Wrangling
 
-```{r}
+```{r hpp}
 hpp <- hpp_data %>%
-  
   mutate(
+    Rep = factor(Rep),
     Organism = factor(Organism),
     Pressure = factor(Pressure),
     pH = factor(pH),
@@ -149,10 +151,10 @@ sum(is.na(hpp))
 head(hpp)
 ```
 
-```{r}
+```{r }
 summary(hpp)
 ```
-
+ 
 
 ```{r hpp}
 hpp %>%
@@ -160,121 +162,178 @@ hpp %>%
   summarise(
     mean_D = mean(Response, na.rm = TRUE),
     sd_D = sd(Response, na.rm = TRUE),
-    n = n()
+n = n()
   ) 
 ```
 
 
-# (d) EDA plots
+# (e) EDA plots
 
 ```{r organism boxplot}
 # D-values by Organism
-ggplot(hpp, aes(x = Organism, y = Response, fill = Organism)) +
+ggplot(hpp, aes(x = Organism, 
+                    y = Response,
+                    color = Organism)) +
   geom_boxplot() +
-  labs(title = "D-values by Organism") +
-  theme_minimal()
+  geom_jitter() +
+  theme(legend.position = "none")
 ```
 
 
 ```{r Pressure boxplot}
-# D-values by Pressure
-ggplot(hpp, aes(x = Pressure, y = Response, fill = Pressure)) +
-  geom_boxplot() +
-  labs(title = "D-values by Pressure") +
-  theme_minimal()
-```
-
-
-```{r pH boxplot}
-# D-values by pH
-ggplot(hpp, aes(x = pH, y = Response, fill = pH)) +
-  geom_boxplot() +
-  labs(title = "D-values by pH") +
-  theme_minimal()
-```
-
-
-```{r Acid boxplot}
-# D-values by Acid
-ggplot(hpp, aes(x = Acid, y = Response, fill = Acid)) +
-  geom_boxplot() +
-  labs(title = "D-values by Acid") +
-  theme_minimal()
-```
-
-##Pivot data longer to use facets
-```{r}
-data_long <- hpp %>%
-  pivot_longer(cols = c(Organism, Pressure, pH, Acid),
-               names_to = "Factor",
-               values_to = "Level")
-
-# Create a faceted boxplot
-ggplot(data_long, aes(x = Level, y = Response, fill = Level)) +
-  geom_boxplot() +
-  facet_wrap(~ Factor, scales = "free_x") +
-  labs(title = "D-values by Experimental Factors",
-       x = "Factor Levels", y = "Response") +
+# D-values by Pressure and Organism
+ggplot(hpp, aes(x = factor(Pressure), y = Response, colour = factor(Pressure))) +
+  geom_boxplot(outlier.shape = NA, alpha = 0.5) +
+  geom_jitter(width = 0.2, alpha = 0.6) +
+  facet_wrap(~ Organism) +
+  labs(
+    x = "Pressure (MPa)",
+    y = "D-value",
+    title = "D-value by Pressure and Organism"
+  ) +
   theme_minimal() +
   theme(legend.position = "none")
 ```
 
 
-```{r}
-# Create a combined factor for all conditions
-data <- hpp %>%
-  mutate(Combo = interaction(Organism, Pressure, pH, Acid,  sep = "_"))
-
-# Plot
-ggplot(data, aes(x = Combo, y = Response, fill = Organism)) +
-  geom_boxplot() +
-  labs(title = "D-values by Combined Experimental Conditions",
-       x = "Experimental Condition",
-       y = "Response") +
+```{r pH boxplot}
+# D-values by pH
+ggplot(hpp, aes(x = factor(pH), y = Response, colour = factor(pH))) +
+  geom_boxplot(outlier.shape = NA, alpha = 0.5) +
+  geom_jitter(width = 0.2, alpha = 0.6) +
+  facet_wrap(~ Organism) +
+  labs(
+    x = "pH",
+    y = "D-value",
+    title = "D-value by pH and Organism"
+  ) +
   theme_minimal() +
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+  theme(legend.position = "none")
+```
+
+
+```{r Acid boxplot}
+# D-values by Acid
+ggplot(hpp, aes(x = factor(Acid), y = Response, colour = factor(Acid))) +
+  geom_boxplot(outlier.shape = NA, alpha = 0.5) +
+  geom_jitter(width = 0.2, alpha = 0.6) +
+  facet_wrap(~ Organism) +
+  labs(
+    x = "Acid",
+    y = "D-value",
+    title = "D-value by Acid and Organism"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+
+
+##Pivot data longer to use facets
+```{r}
+data_long <- hpp %>%
+  mutate(
+    Organism = as.character(Organism),
+    Pressure = as.character(Pressure),
+    pH = as.character(pH),
+    Acid = as.character(Acid)
+  ) %>%
+  pivot_longer(
+    cols = c(Organism, Pressure, pH, Acid),
+    names_to = "Factor",
+    values_to = "Level"
+  )
+
+# Create a faceted boxplot
+ggplot(data_long, aes(x = Level, y = Response, colour = Level)) +
+  geom_boxplot() +
+
+  facet_grid(~ Factor, scales = "free_x") +
+  labs(title = "D-values by Experimental Factors",
+       x = "Factor Levels", y = "Response") +
+  theme_bw() +
+  theme(legend.position = "none") +
+   theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    plot.subtitle = element_text(hjust = 0.5)
+  )
+ggsave("../Output/Dvalues.png",
+       height = 4,
+       width = 6
+       )
 
 ```
 
 
-# (e) Statistical Analaysis
-
 ```{r}
+
+summary_hpp <- hpp %>%
+  group_by(Organism, Pressure, pH, Acid) %>%
+  summarise(mean_D = mean(Response), sd_D = sd(Response), .groups = 'drop')
+
+ggplot(summary_hpp, aes(x = Acid, y = mean_D, fill = Acid)) +
+  geom_col(position = position_dodge(width = 0.9)) +
+  geom_errorbar(aes(ymin = mean_D - sd_D, ymax = mean_D + sd_D),
+                width = 0.2, position = position_dodge(width = 0.9)) +
+  facet_grid(Pressure ~ pH + Organism) +
+  labs(
+   title = "Mean ± SD shown for each treatment group",
+    y = "Mean D-value",
+    x = "Acid Type"
+  ) +
+   theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    plot.subtitle = element_text(hjust = 0.5)
+  ) +
+  theme_bw() 
+ggsave("../Output/mean_sd.png",
+       height = 4,
+       width = 6
+       )
+```
+
+
+# (f) Statistical Model
+
+```{r model}
 # Changing to sum-to-zero contrast
 options(contrasts = c("contr.sum", "contr.poly"))
 
 # Model fitting
-hpp_mod <- lm(Response ~ Organism + Pressure + pH + Acid, data = hpp)
+hpp_rcbd <- lm(Response ~  Organism * Pressure * pH * Acid,
+             data = hpp)
+
 
 # Summary of linear model
-summary(hpp_mod)
+summary(hpp_rcbd)
 ```
 
 ```{r Anova}
-Anova(hpp_mod, type = 3)
+Anova(hpp_rcbd, type = 3)
 
 ```
-
+##(g) Linear model assumptions
+#Residual Extraction 
 ```{r}
-hpp_resid <- augment(hpp_mod) %>%
-  mutate(.studresid=rstudent(hpp_mod))
+hpp_resid <- augment(hpp_rcbd) %>%
+  mutate(.studresid=rstudent(hpp_rcbd))
 
 hpp_resid
 ```
 
+#Residual independence
 
 ```{r}
 ggplot(hpp_resid, aes(x=.fitted, y=.studresid))+
   geom_hline(yintercept = 0, color="red")+ ##geom_hline is for adding horizontal line
   geom_point(shape = 21,
-             fill = "purple", 
+             fill = "pink", 
              size = 3,
              alpha = .7)+
-  geom_smooth()+
+  
   geom_hline(yintercept = c(-3,3), color = "red")+
   theme_bw()
 ```
-
+#Residual homoscedasticity
 ```{r}
 ggplot(hpp_resid, aes(x=.fitted, y=.studresid))+
   geom_hline(yintercept = 0, color="red")+
@@ -286,11 +345,11 @@ ggplot(hpp_resid, aes(x=.fitted, y=.studresid))+
   geom_hline(yintercept = c(-3,3), color = "red")+
   theme_bw()
 ```
-
+##QQ Plot
 ```{r}
 ggplot(hpp_resid, aes(sample=.studresid))+
   stat_qq(  shape = 21,
-            fill = "purple", 
+            fill = "red", 
             size = 3,
             alpha = .7
   )+
@@ -298,19 +357,41 @@ ggplot(hpp_resid, aes(sample=.studresid))+
   labs(x = "Theoretical quantile",
        y = "Sample quantile")+
   theme_bw()
+
+
+
+
+
+res_data <- data.frame(
+  Fitted = fitted(hpp_rcbd),
+  Residuals = resid(hpp_rcbd)
+)
 ```
 
+#Residual Vs Fitted
 ```{r}
-ggplot(hpp_resid, aes(x=.studresid))+
-  geom_density(color = "black",
-               fill = "purple",
-               alpha = .7)+
-  scale_x_continuous(breaks = c(-3,0,3), limits = c(-3,3))+
-  theme_bw()
-
+# Residuals vs Fitted plot
+ggplot(res_data, aes(x = Fitted, y = Residuals)) +
+  geom_point(color = "darkblue", alpha = 0.6) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
+  geom_smooth() +
+  labs(
+    title = "Residuals vs Fitted Plot",
+    x = "Fitted Values",
+    y = "Residuals"
+  ) +
+  theme_bw() +
+   theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    plot.subtitle = element_text(hjust = 0.5)
+  )
+ggsave("../Output/Residualfitted.png",
+       height = 4,
+       width = 6)
 ```
 
 
+#Residual Outliers
 ```{r}
 ggplot(hpp_resid, aes(x=.fitted, y=.studresid))+
   geom_hline(yintercept = 0, color="red")+
@@ -324,154 +405,28 @@ ggplot(hpp_resid, aes(x=.fitted, y=.studresid))+
 ```
 
 
-##Weibull model fitting
-```{r}
-data_model <- data %>%
-  filter(!is.na(Response), Response > 0) %>%
-  # Convert Pressure to numeric
-  mutate(
-    Pressure_numeric = as.numeric(as.character(Pressure))  
-  )
-# Fit Weibull inactivation model
-weibull_model <- nlsLM(
-  Response ~ a * exp(- (Pressure_numeric / b)^c),
-  data = data_model,
-  start = list(a = 5, b = 600, c = 1.5),  # Try adjusting these if it doesn't converge
-  control = nls.control(maxiter = 200, warnOnly = TRUE)
-)
-
-summary(weibull_model)
-
-
-# Add predicted values
-data_model$Weibull_fit <- predict(weibull_model)
-
-# Plot observed vs Weibull fit
-ggplot(data_model, aes(x = Pressure_numeric, y = Response)) +
-  geom_point(color = "blue") +
-  geom_line(aes(y = Weibull_fit), color = "red", size = 1) +
-  labs(title = "Weibull Model Fit",
-       x = "Pressure (MPa)",
-       y = "Response") +
-  theme_minimal()
-
+##(h) Model Means and Pairwise comparison
+```{r means}
+hpp_means <- emmeans(hpp_rcbd, ~Pressure * pH * Acid * Organism)
 ```
-
-##Akaike Information Criterion
-
-```{r}
-aic_results <- AIC(lm_model, weibull_model)
-
-aic_results
-```
-
-
-
-
-
-## EMMeans & Pairwise Comparisons
-
-```{r}
-
-# Main effects EMMs
-
-hpp_means <- emmeans(hpp_mod, ~ Pressure : Acid : pH )
-
-hpp_means
-
-
-# Pairwise comparisons using Tukey HSD
-install.packages("multcompView")
-
-library(multcompView)
-
+```{r pc}
 hpp_cld <- cld(hpp_means, 
                    reversed=T, 
                    adjust="none",
-               Letters=letters)
+               Letters = letters)
 
 hpp_cld
 class(hpp_cld)
-
-# Display the pairwise comparisons result
-summary(pairwise_comparisons)
-
-
-```
-
-##Q-Q plot
-
-```{r}
-# Create data frame for plotting
-resid_fitted_df <- data.frame(
-  Fitted = fitted(lm_model),
-  Residuals = resid(lm_model)
-)
-
-# Plot
-library(ggplot2)
-
-ggplot(resid_fitted_df, aes(x = Fitted, y = Residuals)) +
-  geom_point(size = 2, color = "blue", alpha = 0.6) +
-  geom_smooth(method = "loess", se = FALSE, color = "darkred", linewidth = 1)
-  geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
-  labs(
-    title = "Residuals vs Fitted Values",
-x = "Fitted Values",
-    y = "Residuals"
-  ) +
-  theme_minimal(base_size = 14)
-
 ```
 
 
 
-##Plots
-
-```{r}
-# Estimated marginal means plot for Pressure
-anova_model <- aov(Response ~ Pressure * pH * Acid * Organism, data = data)
-
-emm_all <- bind_rows(
-  as.data.frame(emmeans(model, ~ Pressure)) %>% mutate(Factor = "Pressure", Level = as.character(Pressure)),
-  as.data.frame(emmeans(anova_model, ~ pH)) %>% mutate(Factor = "pH", Level = as.character(pH)),
-  as.data.frame(emmeans(anova_model, ~ Acid)) %>% mutate(Factor = "Acid", Level = as.character(Acid)),
-  as.data.frame(emmeans(anova_model, ~ Organism)) %>% mutate(Factor = "Organism", Level = as.character(Organism))
-)
-
-ggplot(emm_all, aes(x = Level, y = emmean, fill = Factor)) +
-  geom_col(position = position_dodge(width = 0.9), width = 0.6, show.legend = FALSE) +
-  geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), width = 0.2) +
-  facet_wrap(~ Factor, scales = "free_x") +
-  labs(
-    title = "Estimated Marginal Means of D-values",
-    x = "Factor Levels",
-    y = "Estimated Mean D-value"
-  ) +
-  theme_minimal(base_size = 13)
 
 
 
-```
-```{r}
-# Create the plot
-ggplot(emm, aes(x = Pressure, y = emmean)) +
-  geom_point(size = 4, shape = 21, fill = "steelblue") +
-  geom_errorbar(aes(ymin = lower.CL, ymax = upper.CL), width = 0.15, linewidth = 1) +
-  labs(
-    title = "Estimated Marginal Means of D-values by Pressure",
-    x = "Pressure (MPa)",
-    y = "Estimated Marginal Mean Response"
-  ) +
-  theme_minimal(base_size = 14) +
-  theme(
-    plot.title = element_text(face = "bold", hjust = 0.5),
-    axis.title = element_text(face = "bold"),
-    axis.text = element_text(color = "black"),
-    panel.grid.major = element_line(color = "gray85"),
-    panel.grid.minor = element_blank()
-  )
-```
+
+
+
 
 
 Make sure to run a model that reflects your study design. Even if your study design does not include one of the designs covered in class, you are still expected to run the most appropriate model. If you need help for references, let me know.  
