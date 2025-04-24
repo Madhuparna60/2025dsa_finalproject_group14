@@ -1,0 +1,351 @@
+---
+title: "HPP"
+format: html
+editor: visual
+---
+
+## Quarto
+
+Quarto enables you to weave together content and executable code into a finished document. To learn more about Quarto see <https://quarto.org>.
+
+## Running Code
+
+When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this:
+
+```{r}
+1 + 1
+```
+
+You can add options to executable code like this
+
+```{r}
+#| echo: false
+2 * 2
+```
+
+The `echo: false` option disables the printing of code (only output is displayed).
+
+## (a)Loading Required Packages
+
+```{r}
+## (a)Loading Required Packages
+#install.packages("survival")
+library(survival)
+library(readxl) # for loading data
+library(tidyverse)     # For data manipulation and visualization
+library(ggplot2)       # For plotting (also in tidyverse)
+library(car)           # For ANOVA assumption checks
+library(emmeans)       # For estimated marginal means and pairwise comparisons
+library(readr)         # For reading in CSV files
+library(broom)         # For tidying model outputs
+library(ggpubr)        # For  plots
+#install.packages("multcompView")
+library(multcompView)
+
+```
+
+## (b) Load and Inspect Data
+
+```{r data}
+hpp_data <- read_excel("../Data/Data_MD.xlsx")
+
+hpp_data
+```
+
+## (c) EDA tables
+
+```{r glimpse}
+glimpse(hpp_data)
+```
+
+```{r summary}
+summary(hpp_data)
+```
+
+## (d) Data Wrangling
+
+```{r hpp}
+hpp <- hpp_data%>%
+  mutate ( 
+    Rep = factor(Rep),
+    Pressure = factor(Pressure),
+    pH = factor(pH),
+    Acid = factor(Acid),
+    Organism = factor(Organism),
+  )
+
+#check for any missing values
+
+sum (is.na(hpp))
+
+head(hpp)
+```
+
+```{r}
+summary(hpp)
+```
+
+## (e) EDA plots
+
+geom_point()+
+
+```{r}
+#Dvalues by Pressure on Organism
+ggplot(hpp, aes(x = Pressure, 
+           y = Response,
+           colour = Pressure)) +
+  labs( 
+    title = "Effect of Pressure on D-values",
+    x = "Pressure(Mpa)",
+        y = "D-values (seconds)")+
+  facet_wrap(~Organism) +
+geom_boxplot(varwidth = TRUE, outlier.shape = NA, alpha = 0.5)  +
+  geom_jitter(width = 0.2, alpha = 0.6)+
+  theme_bw() +
+  theme(legend.position = "none") 
+
+#D-values by Acid on Organism
+ggplot(hpp, aes(x = Acid, 
+           y = Response,
+           colour = Acid)) +
+  labs( 
+    title = "Effect of Acid on D-values",
+    x = "Acid",
+        y = "D-values (seconds)")+
+  facet_wrap(~Organism) +
+geom_boxplot(varwidth = TRUE, outlier.shape = NA, alpha = 0.5)  +
+  geom_jitter(width = 0.2, alpha = 0.6)+
+  theme_bw() +
+  theme(legend.position = "none") 
+
+#D-values by pH
+ggplot(hpp, aes(x = pH,
+                y = Response,
+               colour = pH
+                )) +
+labs(title = "Effect of pH on D-values",
+     x = "pH",
+     y = "D-values (seconds")+
+geom_boxplot(varwidth = TRUE)+
+  geom_jitter()+
+  theme_bw()+
+  theme(legend.position = "right"
+        )
+
+#Dvalues BY Organism
+ggplot(hpp, aes(x = Organism, 
+           y = Response,
+           colour = Organism)) +
+  labs( 
+    title = "D-values by Organism",
+    x = "Organism",
+        y = "D-values (seconds)")+
+
+geom_boxplot(varwidth = TRUE, outlier.shape = NA, alpha = 0.5)  +
+  geom_jitter(width = 0.2, alpha = 0.6)+
+  
+  theme(legend.position = "none") 
+```
+
+## (f) Final Box-plot
+
+```{r}
+data <- hpp %>%
+  mutate(
+    Organism = as.character(Organism),
+    Pressure = as.character(Pressure),
+    pH = as.character(pH),
+    Acid = as.character(Acid)
+  ) %>%
+  pivot_longer(
+    cols = c(Organism, Pressure, pH, Acid),
+    names_to = "Factor",
+    values_to = "Level"
+  )
+
+# Create a faceted boxplot
+ggplot(data, aes(x = Level, y = Response, fill = Level)) +
+  geom_boxplot() +
+
+  facet_grid(~ Factor, scales = "free_x") +
+  labs(title = "D-values by Experimental Factors",
+       x = "Factor Levels", y = "D-values (seconds)") +
+  theme_bw() +
+  theme(legend.position = "none") +
+   theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    plot.subtitle = element_text(hjust = 0.5)
+  )
+ggsave("../Output/D-values.png")
+```
+
+## (g) Mean & Standard Deviation
+
+```{r}
+summary_hpp <- hpp %>%
+  group_by(Organism, Pressure, pH, Acid, Rep, .groups = "drop") %>%
+  summarise(
+    mean_D = mean(Response, na.rm = TRUE),
+    sd_D = sd(Response, na.rm = TRUE),
+    n = n()
+  )
+summary_hpp
+```
+
+## (h) Mean & SD plot
+
+```{r plot}
+
+summary_hpp <- hpp %>%
+  group_by(Organism, Pressure, pH, Acid) %>%
+  summarise(mean_D = mean(Response), sd_D = sd(Response), .groups = 'drop')
+
+ggplot(summary_hpp, aes(x = Acid, y = mean_D, fill = Acid)) +
+  geom_col(position = position_dodge(width = 0.9)) +
+  geom_errorbar(aes(ymin = mean_D - sd_D, ymax = mean_D + sd_D),
+                width = 0.2, position = position_dodge(width = 0.9)) +
+  facet_grid(Pressure ~ pH + Organism) +
+  labs(
+   title = "Mean ± SD shown for each treatment group",
+    y = "Mean D-value",
+    x = "Acid Type"
+  ) +
+   theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    plot.subtitle = element_text(hjust = 0.5)
+  ) +
+  theme_bw() 
+ggsave("../Output/mean_sd.png",
+       height = 4,
+       width = 6)
+```
+
+## (f) Statistical Model
+
+```{r model}
+# Changing to sum-to-zero contrast
+
+options(contrasts = c("contr.sum", "contr.poly"))
+
+# Model fitting 
+#log-linear model
+
+model1 <- lm(Response ~ Pressure * Organism * Acid * pH, data = hpp)
+
+summary(model1)
+
+#Weibull Fitting
+ any(hpp$Response <= 0)
+ # Remove rows with Response <= 0
+hpp <- hpp %>% filter(Response > 0)
+
+#addition of a small constant to avoid zero values
+hpp <- hpp %>% mutate(Response = Response + 0.001)
+
+model2 <- survreg(Surv(Response) ~ Pressure + pH + Acid + Organism, data = hpp, dist = "weibull")
+
+summary(model2)
+
+
+```
+
+```{r Distribution plot}
+# Predict values based on the model
+predicted_response <- predict(model2, type = "response")
+
+##Weibul Distribution Plot
+# Extract coefficients and parameters from the model
+shape <- 1 / model2$scale  # Shape parameter
+scale <- exp(model2$coef) # Scale parameter
+
+# Create a custom survival curve
+time <- seq(0, max(hpp$Response), length.out = 100)  # Time points
+survival_prob <- exp(-(time / scale)^shape)  # Survival probabilities
+
+# Plot the survival curve
+plot(time, survival_prob, type = "l", col = "blue",
+     main = "Weibull Survival Curve", xlab = "Time", ylab = "Survival Probability")
+
+```
+
+## (g) Residual Diagnostic
+
+```{r Residuals}
+# Residuals for Log-Linear Model
+res_loglinear <- residuals(model1)
+
+##Residual Vs Fitted
+
+fitted_values_loglinear <- fitted(model1)
+plot(fitted_values_loglinear, res_loglinear, main = "Residuals vs. Fitted Values for Log-Linear Model", ylab = "Residuals", xlab = "Fitted Values")
+
+
+# Residuals for Weibull Model
+res_weibull <- residuals(model2)
+
+
+## Residual Vs Fitted
+
+fitted_values_weibull <- fitted(model2)
+plot(fitted_values_weibull, res_weibull, main = "Residuals vs. Fitted Values for Weibull Model", ylab = "Residuals", xlab = "Fitted Values")
+
+```
+
+```{r Q-Q plot}
+
+#QQ plot for log-linear model
+
+qqnorm(res_loglinear, main = "Q-Q Plot for Log-Linear Model Residuals")
+qqline(res_loglinear)
+
+
+
+#QQ plot for Weibull model
+
+qqnorm(res_weibull, main = "Q-Q Plot for Weibull Model Residuals")
+qqline(res_weibull)
+
+```
+
+```{r}
+# Predict with log-Linear Model
+pred_loglinear <- predict(model1, type = "response")
+
+# Predict with Weibull Model
+pred_weibull <- predict(model2, type = "response")
+
+print(pred_loglinear)
+print(pred_loglinear)
+
+```
+
+```{r log-linear plot fit}
+predicted_values <- predict(model1, newdata = hpp, type = "response")
+
+plot(hpp$Response, predicted_values, col = "red",
+     main = "Log-Linear Model Fit", xlab = "Observed D-Values", ylab = "Predicted  D-Values")
+
+```
+
+```{r Weibull plot fit}
+predicted_values <- predict(model2, newdata = hpp, type = "response")
+
+plot(hpp$Response, predicted_values, col = "red",
+     main = "Weibul Modell Fit", xlab = "Observed D-Values", ylab = "Predicted D-Values")
+
+```
+
+# (h) Akaike Information Criterion
+
+```{r AIC}
+# Calculate AIC for Log-linear model
+aic_loglinear <- AIC(model1)
+
+# Calculate AIC for Weibull model
+aic_weibull <- AIC(model2)
+
+# Display AIC values
+print(paste("AIC for Log-Linear Model:", aic_loglinear))
+print(paste("AIC for Weibull Model:", aic_weibull))
+
+```

@@ -42,22 +42,46 @@ The central hypothesis of our study revolves around the idea that a combination 
 # Material and Methods  
 Describe here your overall material and methods as it pertains to the analysis you will conduct, including study description, site/setup description, what equipment was used, etc. just like you would in a paper. Make sure to clearly explain what was measured and how.
 
-A model solution system prepared by combining sterile Tryptic soy broth (TSB) with three different types of organic acid (Citric, Malic and Ascorbic acid) and adjusting the pH to 3.5, 4.0 and 4.5 to simulate the acidity of natural fruit juices. The solutions were aliquoted into sterile 2 ml vials after inoculation and sealed to prevent contamination during high pressure processing (HPP). Five Listeria monocytogenes strains, selected based on recent outbreak history, serotype diversity, and relevance to acidic produce, were cultured individually and combined into 5-strain cocktail. A total of 45ml of model juice was inoculated with 5 ml of the cocktail to achieve a target concentration of 8-9 log CFU/ml. About 2 ml of this inoculated solution was transferred into sterile 3 ml luer lock syringes and subjected to HPP at ambient temperature (22°C) using a laboratory scale HPP system ((Unipress Equipment, Warsaw, Poland) with varying pressure (500-700 MPa) and time combinations to achieve at least a 5-log reduction. Each condition was independently replicated three times. Post treatment, samples were serially diluted in 0.1 % sterile peptone water, spread plated on TSA and incubated at 37°C for 48  2h. Colonies (25 – 250 per plate) were enumerated and expressed as log CFU/ml. Survival data were analyzed using the n-way ANOVA function in MATLAB 2024b, with pressure, time and pH as continuous variables, and acid type as a categorical variable. Interaction effects among parameters were evaluated and statistical significance was set at  = 0.05.
+A model solution system prepared by combining sterile Tryptic soy broth (TSB) with three different types of organic acid (Citric, Malic and Ascorbic acid) and adjusting the pH to 3.5, 4.0 and 4.5 to simulate the acidity of natural fruit juices. The solutions were aliquoted into sterile 2 ml vials after inoculation and sealed to prevent contamination during high pressure processing (HPP). Five Listeria monocytogenes strains, selected based on recent outbreak history, serotype diversity, and relevance to acidic produce, were cultured individually and combined into 5-strain cocktail. A total of 45ml of model juice was inoculated with 5 ml of the cocktail to achieve a target concentration of 8-9 log CFU/ml. About 2 ml of this inoculated solution was transferred into sterile 3 ml luer lock syringes and subjected to HPP at ambient temperature (22°C) using a laboratory scale HPP system ((Unipress Equipment, Warsaw, Poland) with varying pressure (500-700 MPa) and time combinations to achieve at least a 5-log reduction. Each condition was independently replicated three times. Post treatment, samples were serially diluted in 0.1 % sterile peptone water, spread plated on TSA and incubated at 37°C for 48  2h. Colonies (25 – 250 per plate) were enumerated and expressed as log CFU/ml. Survival data were analyzed using the n-way ANOVA function in MATLAB 2024b, with pressure, time and pH as continuous variables, and acid type as a categorical variable. Interaction effects among parameters were evaluated and statistical significance was set at alpha = 0.05.
 
 ## Study design  
 Clearly describe your study design here, including treatment design (which factors and levels, the hierarchy among them, etc.), and your experimental design (number of reps/blocks, how was randomization performed, etc.), as we talked about in class.  
 
-The goal of this study is to assess how multiple factors—Organism type, Pressure, pH, and Acid type—affect microbial inactivation, which is measured by D-values, using High Pressure Processing (HPP). This study focuses on two pathogens transmitted by food: Listeria monocytogenes and Escherichia coli.
+The goal of this study is to assess how multiple factors—Organism type, Pressure, pH, and Acid type—affect microbial inactivation, which is measured by D-values, using High Pressure Processing (HPP). This study focuses on two pathogens transmitted by food: Listeria monocytogenes and Escherichia coli(O157:H7).
 
+The study involves several factors, each with specific levels:
+
+Pressure: Three levels (500, 600, 700 units)
+pH: Three levels (3.5, 4.0, 4.5)
+Acid Type: Three levels (Malic Acid (MA), Citric Acid (CA), Acetic Acid (AA))
+Organism: Two levels (Listeria monocytogenes (L. mono), Escherichia coli (E. coli))
+These factors are hierarchical in nature, meaning each combination of pressure, pH, acid type, and organism represents a unique treatment.
+
+Experimental Design
 Design Type: Full factorial (2 × 3 × 3 × 3 = 54 treatment combinations)
 Replication: Each treatment combination was replicated three times, resulting in a total of 162 observations.
-Randomization: Treatments were randomized within each replicate to minimize systematic bias and environmental variation. Randomization was performed using a computer-generated random sequence in Excel
+Randomization: Treatments were randomized within each replicate to minimize systematic bias and environmental variation. 
+
+Data Colelction:
+Data is collected for each replicate under each treatment combination, resulting in a comprehensive dataset that includes:
+
+Pressure
+pH
+Acid Type
+Organism
+Response (D values)
+Replicate
 
 
 ## Statistical analysis  
 Describe here your statistical analysis, including what type of ANOVA model you ran (based on the design above), what was your response variable, what were your explanatory variables and how were the explanatory variables treated (random or fixed). Provide your alpha level. Explain which function from which package you used to analyze this data. Explain how you checked linear model assumptions and whether or not they were met. Overall, make sure you explain in sufficient detail that, if given your data, a knowledgeable person would be able to reproduce your analysis exactly.  
 
+Analysis
+The data is analyzed using a mixed-effects regression model to account for both fixed effects (pressure, pH, acid type, organism) and random effects (replicates). The model helps in understanding the impact of each factor on the response variable while controlling for variability due to replication.
 A multi-factorial ANOVA model was used to assess the effect of four explanatory variables—Organism, Pressure, pH, and Acid Type—on microbial inactivation, measured by D-values.
+
+Visualization:
+Various plots are created to visualize the relationships between the factors and the response variable, including interaction plots and regression lines.
 
 Response Variable:
 D_value (Decimal reduction time), a continuous variable.
@@ -74,14 +98,15 @@ The significance level was set at α = 0.05 for all statistical tests.
 R Packages and Functions Used
 Base R:
 aov() for ANOVA
-lm() for linear model fitting
+lme4() for regression model fitting
 car package:
 Anova() from the car package was used for Type III sums of squares (when needed)
 ggplot2: For residual diagnostics and interaction plots
 emmeans: For post hoc pairwise comparisons and estimated marginal means
 emmeans()
 
-Model: model <- lm(D_value ~ Organism * Pressure + Organism * pH + Organism * Acid + Pressure * pH * Acid, data = mydata)
+Model = lmer(Response ~ Pressure + pH + Acid + Organism + (1 | Rep), data = hpp)
+
  **Pressure and pH were treated as numeric variables**
 Checking Model Assumptions:
 Assumptions were assessed using both visual and statistical methods:
@@ -97,24 +122,29 @@ Multicollinearity (since we are treating Pressure & pH as numeric) were checked 
 # Results  
 Here is where the coding is going to happen, and it will be completely up to you. Include under this section as many sub-sections (using ##) and as many chunks needed to create the analytical workflow for your analysis, starting at loading packages and data, wrangling, EDA, modeling, assumptions checking, ANOVA table, means, pairwise comparisons, and final publication-quality plot.
 
-## (a)Loading Required Packages
+##(a)Loading Required Packages
 
 ```{r}
+install.packages("multcompView")
+#install.packages("lme4")
 library(readxl) # for loading data
 library(tidyverse)     # For data manipulation and visualization
 library(ggplot2)       # For plotting (also in tidyverse)
 library(car)           # For ANOVA assumption checks
+install.packages("emmeans")
 library(emmeans)       # For estimated marginal means and pairwise comparisons
 library(readr)         # For reading in CSV files
 library(broom)         # For tidying model outputs
 library(ggpubr)        # For  plots
-install.packages("multcompView")
-
+library(lme4)
 library(multcompView)
+library(nlraa)
+library(janitor)
+
 
 ```
 
-## (b) Load and Inspect Data
+##(b) Load and Inspect Data
 
 ```{r}
  hpp_data<- read_excel("../Data/Data_MD.xlsx")
@@ -122,28 +152,23 @@ library(multcompView)
 hpp_data
 
 ```
-## (c) EDA tables
+##(c) EDA tables
 
 ```{r summary}
 summary(hpp_data)
 ```
 
-```{r glimpse}
-glimpse(hpp_data)
-```
+The d-values ranging from 0 to 15.221 seconds Mg/ha.  
 
-## (d) Data Wrangling
+##(d) Data Wrangling
 
 ```{r hpp}
 hpp <- hpp_data %>%
   mutate(
-    Rep = factor(Rep),
-    Organism = factor(Organism),
-    Pressure = factor(Pressure),
-    pH = factor(pH),
-    Acid = factor(Acid)
+    Rep = as.factor(Rep),
+    Organism = as.factor(Organism),
+    Acid = as.factor(Acid)
   )
-    
 #Check for any missing values
 sum(is.na(hpp))
 
@@ -155,76 +180,62 @@ head(hpp)
 summary(hpp)
 ```
  
+##(e) EDA plots
 
-```{r hpp}
-hpp %>%
-  group_by(Organism, Pressure, pH, Acid) %>%
-  summarise(
-    mean_D = mean(Response, na.rm = TRUE),
-    sd_D = sd(Response, na.rm = TRUE),
-n = n()
-  ) 
+```{r plot}
+ggplot(data = hpp,
+       aes(x = Pressure,
+           y = Response)) +
+geom_point() +
+  geom_line()
+```
+
+```{r plot + smooth}
+ggplot(data = hpp, 
+       aes(x = Pressure,
+        y = Response))+
+
+  geom_point() +
+
+geom_smooth()
+
 ```
 
 
-# (e) EDA plots
+```{r boxplot}
 
-```{r organism boxplot}
-# D-values by Organism
-ggplot(hpp, aes(x = Organism, 
-                    y = Response,
-                    color = Organism)) +
-  geom_boxplot() +
-  geom_jitter() +
-  theme(legend.position = "none")
+ggplot(hpp, aes(x = factor(pH), y = Response, colour = Organism)) +
+geom_boxplot() +
+labs(title = "pH vs. D-value", x = "pH", y = "D-value") +
+theme_minimal()
+
+
+ggplot(hpp, aes(x = factor(Acid), y = Response, colour = Organism)) +
+geom_boxplot() +
+labs(title = "Acid vs. D-value", x = "Acid", y = "D-value") +
+theme_minimal()
+
+
+ggplot(hpp, aes(x = factor(Pressure), y = Response, colour = Organism)) +
+geom_boxplot() +
+labs(title = "Pressure vs. D-value", x = "Pressure", y = "D-value") +
+theme_minimal()
+
+
 ```
 
 
-```{r Pressure boxplot}
-# D-values by Pressure and Organism
-ggplot(hpp, aes(x = factor(Pressure), y = Response, colour = factor(Pressure))) +
-  geom_boxplot(outlier.shape = NA, alpha = 0.5) +
-  geom_jitter(width = 0.2, alpha = 0.6) +
-  facet_wrap(~ Organism) +
-  labs(
-    x = "Pressure (MPa)",
-    y = "D-value",
-    title = "D-value by Pressure and Organism"
-  ) +
-  theme_minimal() +
-  theme(legend.position = "none")
-```
 
 
 ```{r pH boxplot}
-# D-values by pH
-ggplot(hpp, aes(x = factor(pH), y = Response, colour = factor(pH))) +
-  geom_boxplot(outlier.shape = NA, alpha = 0.5) +
-  geom_jitter(width = 0.2, alpha = 0.6) +
-  facet_wrap(~ Organism) +
-  labs(
-    x = "pH",
-    y = "D-value",
-    title = "D-value by pH and Organism"
-  ) +
-  theme_minimal() +
-  theme(legend.position = "none")
-```
+# Create interaction plot
+ggplot(hpp, aes(x = factor(Pressure), y = Response, colour = Organism)) +
+  geom_boxplot() +
+  facet_grid(Acid ~ pH) +
+  labs(title = "Interaction Plot: Pressure, Acid, pH vs. D-value", x = "Pressure", y = "D-value") +
+  theme(legend.position = "none")+
+  theme_bw()
 
-
-```{r Acid boxplot}
-# D-values by Acid
-ggplot(hpp, aes(x = factor(Acid), y = Response, colour = factor(Acid))) +
-  geom_boxplot(outlier.shape = NA, alpha = 0.5) +
-  geom_jitter(width = 0.2, alpha = 0.6) +
-  facet_wrap(~ Organism) +
-  labs(
-    x = "Acid",
-    y = "D-value",
-    title = "D-value by Acid and Organism"
-  ) +
-  theme_minimal() +
-  theme(legend.position = "none")
 ```
 
 
@@ -256,144 +267,97 @@ ggplot(data_long, aes(x = Level, y = Response, colour = Level)) +
     plot.title = element_text(hjust = 0.5, face = "bold"),
     plot.subtitle = element_text(hjust = 0.5)
   )
-ggsave("../Output/Dvalues.png",
-       height = 4,
-       width = 6
-       )
-
 ```
 
 
-```{r}
-
-summary_hpp <- hpp %>%
-  group_by(Organism, Pressure, pH, Acid) %>%
-  summarise(mean_D = mean(Response), sd_D = sd(Response), .groups = 'drop')
-
-ggplot(summary_hpp, aes(x = Acid, y = mean_D, fill = Acid)) +
-  geom_col(position = position_dodge(width = 0.9)) +
-  geom_errorbar(aes(ymin = mean_D - sd_D, ymax = mean_D + sd_D),
-                width = 0.2, position = position_dodge(width = 0.9)) +
-  facet_grid(Pressure ~ pH + Organism) +
-  labs(
-   title = "Mean ± SD shown for each treatment group",
-    y = "Mean D-value",
-    x = "Acid Type"
-  ) +
-   theme(
-    plot.title = element_text(hjust = 0.5, face = "bold"),
-    plot.subtitle = element_text(hjust = 0.5)
-  ) +
-  theme_bw() 
-ggsave("../Output/mean_sd.png",
-       height = 4,
-       width = 6
-       )
-```
 
 
-# (f) Statistical Model
+## (f) Statistical Model
 
-```{r model}
+```{r regression model}
 # Changing to sum-to-zero contrast
 options(contrasts = c("contr.sum", "contr.poly"))
 
 # Model fitting
-hpp_rcbd <- lm(Response ~  Organism * Pressure * pH * Acid,
-             data = hpp)
-
+mod1_hpp <- lmer(Response ~ Pressure + pH + Acid + Organism + (1 | Rep), data = hpp)
 
 # Summary of linear model
-summary(hpp_rcbd)
+summary(mod1_hpp)
 ```
 
-```{r Anova}
-Anova(hpp_rcbd, type = 3)
 
-```
-##(g) Linear model assumptions
+##(g) Model assumptions
 #Residual Extraction 
 ```{r}
-hpp_resid <- augment(hpp_rcbd) %>%
-  mutate(.studresid=rstudent(hpp_rcbd))
+hpp_resid <- augment(mod1_hpp) %>%
+  mutate(.stdresid = resid(mod1_hpp,
+                             type = "pearson",
+                             scaled = T
+                              )) %>%
+  left_join(hpp)
 
 hpp_resid
 ```
 
 #Residual independence
 
-```{r}
-ggplot(hpp_resid, aes(x=.fitted, y=.studresid))+
-  geom_hline(yintercept = 0, color="red")+ ##geom_hline is for adding horizontal line
-  geom_point(shape = 21,
-             fill = "pink", 
-             size = 3,
+```{r mod1 Standardized Residuals vs. Fitted}
+ggplot(hpp_resid, 
+       aes(x = .fitted, 
+           y = .stdresid))+
+  geom_hline(yintercept = 0, 
+             color = "red")+
+  geom_point(size = 3, 
              alpha = .7)+
-  
-  geom_hline(yintercept = c(-3,3), color = "red")+
-  theme_bw()
+  geom_smooth()
 ```
 #Residual homoscedasticity
-```{r}
-ggplot(hpp_resid, aes(x=.fitted, y=.studresid))+
-  geom_hline(yintercept = 0, color="red")+
-  geom_point(shape = 21,
-             fill = "purple", 
-             size = 3,
-             alpha = .7)+
-  geom_smooth()+
-  geom_hline(yintercept = c(-3,3), color = "red")+
-  theme_bw()
-```
-##QQ Plot
-```{r}
-ggplot(hpp_resid, aes(sample=.studresid))+
-  stat_qq(  shape = 21,
-            fill = "red", 
+```{r mod1 Q-Q Plot}
+ggplot(hpp_resid, 
+       aes(sample = .stdresid))+
+  stat_qq(shape = 21,
+            fill = "purple", 
             size = 3,
-            alpha = .7
-  )+
-  stat_qq_line()+
+            alpha = .7)+
+  stat_qq_line() +
   labs(x = "Theoretical quantile",
        y = "Sample quantile")+
   theme_bw()
+```
+##QQ Plot
+```{r mod1 QQ plot for Location:fRep random effects}
 
+mod1_hpp_randeff <- ranef(mod1_hpp)[[1]] 
 
-
-
-
-res_data <- data.frame(
-  Fitted = fitted(hpp_rcbd),
-  Residuals = resid(hpp_rcbd)
-)
+ggplot(mod1_hpp_randeff, 
+       aes(sample = `(Intercept)`))+
+  stat_qq()+
+  stat_qq_line()
 ```
 
-#Residual Vs Fitted
-```{r}
-# Residuals vs Fitted plot
-ggplot(res_data, aes(x = Fitted, y = Residuals)) +
-  geom_point(color = "darkblue", alpha = 0.6) +
-  geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
-  geom_smooth() +
-  labs(
-    title = "Residuals vs Fitted Plot",
-    x = "Fitted Values",
-    y = "Residuals"
-  ) +
-  theme_bw() +
-   theme(
-    plot.title = element_text(hjust = 0.5, face = "bold"),
-    plot.subtitle = element_text(hjust = 0.5)
-  )
-ggsave("../Output/Residualfitted.png",
-       height = 4,
-       width = 6)
+##(h) ANOVA
+```{r Anova}
+anova(mod1_hpp, type = 3)
+
+```
+
+```{r linear model}
+# Changing to sum-to-zero contrast
+options(contrasts = c("contr.sum", "contr.poly"))
+
+# Model fitting
+mod2_hpp <- lmer(yield_mgha ~ (1|rep) + sr_ksha,
+                 data = reg_dfw
+                 )
+
+# Summary
+summary(mod2_lin)
 ```
 
 
 #Residual Outliers
 ```{r}
-ggplot(hpp_resid, aes(x=.fitted, y=.studresid))+
+ggplot(hpp_resid, aes(x=.fitted, y=.stdresid))+
   geom_hline(yintercept = 0, color="red")+
   geom_point(shape = 21,
              fill = "purple", 
@@ -402,21 +366,40 @@ ggplot(hpp_resid, aes(x=.fitted, y=.studresid))+
   geom_smooth()+
   geom_hline(yintercept = c(-3,3), color = "red")+
   theme_bw()
+
+```
+
+
+```{r}
+
+residuals <- resid(hpp_reg)
+
+
+qqnorm(residuals)
+qqline(residuals)
 ```
 
 
 ##(h) Model Means and Pairwise comparison
 ```{r means}
-hpp_means <- emmeans(hpp_rcbd, ~Pressure * pH * Acid * Organism)
-```
-```{r pc}
-hpp_cld <- cld(hpp_means, 
-                   reversed=T, 
-                   adjust="none",
-               Letters = letters)
+emmeans_model <- emmeans(hpp_reg, ~ Pressure*pH*Acid | Organism)
+summary(emmeans_model)
 
-hpp_cld
-class(hpp_cld)
+pairs(emmeans_model)
+
+ggplot(hpp, aes(x = Acid, y = Response, fill = Organism)) +
+  facet_grid(~ Pressure) +
+  geom_boxplot() +
+  stat_summary(fun = mean, geom = "point", shape = 20, size = 3, color = "red") +
+  labs(title = "Effect of Acid and Organism on Response", x = "Acid", y = "Response") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
+    axis.title = element_text(size = 12),
+    axis.text = element_text(size = 10)
+  )
+
+
 ```
 
 
