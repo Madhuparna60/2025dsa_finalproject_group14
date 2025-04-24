@@ -154,7 +154,8 @@ hpp_data
 ```
 ##(c) EDA tables
 
-```{r summary}
+```{r glimpse}
+glimpse(hpp_data)
 summary(hpp_data)
 ```
 
@@ -173,33 +174,14 @@ hpp <- hpp_data %>%
 sum(is.na(hpp))
 
 # Preview cleaned data
-head(hpp)
+summary(hpp)
 ```
 
 ```{r }
 summary(hpp)
 ```
  
-##(e) EDA plots
 
-```{r plot}
-ggplot(data = hpp,
-       aes(x = Pressure,
-           y = Response)) +
-geom_point() +
-  geom_line()
-```
-
-```{r plot + smooth}
-ggplot(data = hpp, 
-       aes(x = Pressure,
-        y = Response))+
-
-  geom_point() +
-
-geom_smooth()
-
-```
 
 
 ```{r boxplot}
@@ -227,7 +209,7 @@ theme_minimal()
 
 
 
-```{r pH boxplot}
+```{r interaction boxplot}
 # Create interaction plot
 ggplot(hpp, aes(x = factor(Pressure), y = Response, colour = Organism)) +
   geom_boxplot() +
@@ -238,171 +220,192 @@ ggplot(hpp, aes(x = factor(Pressure), y = Response, colour = Organism)) +
 
 ```
 
+##(e) Modeling
+```{r mod1}
 
-##Pivot data longer to use facets
-```{r}
-data_long <- hpp %>%
-  mutate(
-    Organism = as.character(Organism),
-    Pressure = as.character(Pressure),
-    pH = as.character(pH),
-    Acid = as.character(Acid)
-  ) %>%
-  pivot_longer(
-    cols = c(Organism, Pressure, pH, Acid),
-    names_to = "Factor",
-    values_to = "Level"
-  )
-
-# Create a faceted boxplot
-ggplot(data_long, aes(x = Level, y = Response, colour = Level)) +
-  geom_boxplot() +
-
-  facet_grid(~ Factor, scales = "free_x") +
-  labs(title = "D-values by Experimental Factors",
-       x = "Factor Levels", y = "Response") +
-  theme_bw() +
-  theme(legend.position = "none") +
-   theme(
-    plot.title = element_text(hjust = 0.5, face = "bold"),
-    plot.subtitle = element_text(hjust = 0.5)
-  )
-```
-
-
-
-
-## (f) Statistical Model
-
-```{r regression model}
-# Changing to sum-to-zero contrast
-options(contrasts = c("contr.sum", "contr.poly"))
-
-# Model fitting
-mod1_hpp <- lmer(Response ~ Pressure + pH + Acid + Organism + (1 | Rep), data = hpp)
-
-# Summary of linear model
+mod1_hpp <- lm(Response ~ Pressure + pH + Organism + Acid + Rep, data = hpp)
 summary(mod1_hpp)
+
 ```
 
+```{r mod2}
+# Fit GLM (assuming Poisson distribution for example)
+mod2_hpp <- lm(Response ~ Pressure + pH + Organism + Acid, data = hpp, family = poisson())
+summary(mod2_hpp)
 
-##(g) Model assumptions
-#Residual Extraction 
+```
+
+```{r mod3}
+# Fit mixed effect model
+mod3_hpp <- lmer(Response ~ Pressure + Acid + Organism + (1 | Rep), data = hpp)
+summary(mod3_hpp)
+
+```
+##(f) Assumptions Checking
+```{r residual}
+#Residual Checks for Linear Model
+# Residual plots
+
+par(mar = c(2, 2, 2, 2))
+plot(mod1_hpp)
+
+# QQ plot
+qqnorm(residuals(mod1_hpp))
+qqline(residuals(mod1_hpp))
+
+```
+
+```{r residual glm}
+#Residual Checks for General Linear Model
+# Residual plots for GLM
+par(mar = c(2, 2, 2, 2))
+plot(mod2_hpp)
+
+# QQ plot
+qqnorm(residuals(mod2_hpp))
+qqline(residuals(mod2_hpp))
+
+```
 ```{r}
-hpp_resid <- augment(mod1_hpp) %>%
-  mutate(.stdresid = resid(mod1_hpp,
-                             type = "pearson",
-                             scaled = T
-                              )) %>%
-  left_join(hpp)
+#Residual Checks for Mixed Effect model
+#Residual Plots
 
-hpp_resid
+par(mar = c(2, 2, 2, 2))
+plot(mod3_hpp)
+
+# QQ plot
+qqnorm(residuals(mod3_hpp))
+qqline(residuals(mod3_hpp))
 ```
 
-#Residual independence
-
-```{r mod1 Standardized Residuals vs. Fitted}
-ggplot(hpp_resid, 
-       aes(x = .fitted, 
-           y = .stdresid))+
-  geom_hline(yintercept = 0, 
-             color = "red")+
-  geom_point(size = 3, 
-             alpha = .7)+
-  geom_smooth()
-```
-#Residual homoscedasticity
-```{r mod1 Q-Q Plot}
-ggplot(hpp_resid, 
-       aes(sample = .stdresid))+
-  stat_qq(shape = 21,
-            fill = "purple", 
-            size = 3,
-            alpha = .7)+
-  stat_qq_line() +
-  labs(x = "Theoretical quantile",
-       y = "Sample quantile")+
-  theme_bw()
-```
-##QQ Plot
-```{r mod1 QQ plot for Location:fRep random effects}
-
-mod1_hpp_randeff <- ranef(mod1_hpp)[[1]] 
-
-ggplot(mod1_hpp_randeff, 
-       aes(sample = `(Intercept)`))+
-  stat_qq()+
-  stat_qq_line()
-```
-
-##(h) ANOVA
-```{r Anova}
-anova(mod1_hpp, type = 3)
-
-```
-
-```{r linear model}
-# Changing to sum-to-zero contrast
-options(contrasts = c("contr.sum", "contr.poly"))
-
-# Model fitting
-mod2_hpp <- lmer(yield_mgha ~ (1|rep) + sr_ksha,
-                 data = reg_dfw
-                 )
-
-# Summary
-summary(mod2_lin)
-```
-
-
-#Residual Outliers
+##(g) ANOVA Table
 ```{r}
-ggplot(hpp_resid, aes(x=.fitted, y=.stdresid))+
-  geom_hline(yintercept = 0, color="red")+
-  geom_point(shape = 21,
-             fill = "purple", 
-             size = 3,
-             alpha = .7)+
-  geom_smooth()+
-  geom_hline(yintercept = c(-3,3), color = "red")+
-  theme_bw()
+#Anova for lm
 
+anova(mod1_hpp)
 ```
-
 
 ```{r}
+#Anova for glm
+anova(mod2_hpp, test = "Chisq")
 
-residuals <- resid(hpp_reg)
-
-
-qqnorm(residuals)
-qqline(residuals)
 ```
 
+```{r}
+#Anova for mixed effects model
 
-##(h) Model Means and Pairwise comparison
-```{r means}
-emmeans_model <- emmeans(hpp_reg, ~ Pressure*pH*Acid | Organism)
-summary(emmeans_model)
+anova(mod3_hpp)
+```
+ ##(h) Means and Pairwise Comparisons
+```{r}
+#Means and Pairwise Comparisons for Linear Model
 
-pairs(emmeans_model)
+# Estimated marginal means
+emmeans_mod1_hpp <- emmeans(mod1_hpp, ~ Acid + Organism)
+summary(emmeans_mod1_hpp)
 
-ggplot(hpp, aes(x = Acid, y = Response, fill = Organism)) +
-  facet_grid(~ Pressure) +
-  geom_boxplot() +
-  stat_summary(fun = mean, geom = "point", shape = 20, size = 3, color = "red") +
-  labs(title = "Effect of Acid and Organism on Response", x = "Acid", y = "Response") +
-  theme_minimal() +
-  theme(
-    plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
-    axis.title = element_text(size = 12),
-    axis.text = element_text(size = 10)
-  )
+# Pairwise comparisons
+pairs(emmeans_mod1_hpp)
 
 
 ```
 
+```{r}
+#Means and Pairwise Comparisons for glm
 
+# Estimated marginal means
+emmeans_mod2_hpp <- emmeans(mod2_hpp, ~ Acid + Organism)
+summary(emmeans_mod2_hpp)
+
+# Pairwise comparisons
+pairs(emmeans_mod2_hpp)
+```
+
+```{r}
+#Means and Pairwise Comparisons for mixed effect model
+# Estimated marginal means
+emmeans_mod3_hpp <- emmeans(mod3_hpp, ~ Acid + Organism)
+summary(emmeans_mod3_hpp)
+
+# Pairwise comparisons
+pairs(emmeans_mod3_hpp)
+```
+
+```{r AIC}
+
+# Calculate AIC for each model
+aic_model1 <- AIC(mod1_hpp)
+aic_model2 <- AIC(mod2_hpp)
+aic_model3 <- AIC(mod3_hpp)
+
+# Print AIC values
+print(paste("AIC for Model 1:", aic_model1))
+print(paste("AIC for Model 2:", aic_model2))
+print(paste("AIC for Model 3:", aic_model3))
+
+
+# Choose the best model based on AIC
+
+best_model <- list(mod1_hpp, mod2_hpp, mod3_hpp)[[which.min(c(aic_model1, aic_model2, aic_model3))]]
+summary(best_model)
+
+```
+
+
+```{r}
+# Residuals plot for the best model
+plot(best_model$fitted.values, best_model$residuals)
+abline(h = 0, col = "red")
+
+# QQ plot for the best model
+qqPlot(best_model$residuals, main = "QQ Plot for Best Model")
+
+```
+
+```{r final plot}
+
+ggplot(hpp, aes(x = factor(pH), y = Response, colour = Organism)) +
+geom_boxplot() +
+labs(title = "pH vs. D-value", x = "pH", y = "D-value") +
+theme_minimal()
+
+
+ggplot(hpp, aes(x = factor(Acid), y = Response, colour = Organism)) +
+geom_boxplot() +
+labs(title = "Acid vs. D-value", x = "Acid", y = "D-value") +
+theme_minimal()
+
+
+ggplot(hpp, aes(x = factor(Pressure), y = Response, colour = Organism)) +
+geom_boxplot() +
+labs(title = "Pressure vs. D-value", x = "Pressure", y = "D-value") +
+theme_minimal()
+
+# Create interaction plot
+
+ggplot(hpp, aes(x = Pressure, y = Response, fill = Organism)) +
+geom_boxplot() +
+ facet_grid(Acid ~ pH) +
+theme_bw() +
+theme(
+  legend.position = "none",
+strip.text = element_text(size = 7),
+ axis.title = element_text(size = 7),
+ axis.text = element_text(size = 6),
+ legend.title = element_text(size = 6),
+ legend.text = element_text(size = 5)
+) +
+  scale_x_continuous(
+limits = c(500, 700), # Set the limits for the x-axis
+breaks = seq(500, 700, by = 100) # Set the breaks for the x-axis
+) +
+labs(
+ title = "Interaction Plot: Pressure, Acid, pH vs. Response",
+x = "Pressure",
+y = "Response",
+color = "Organism"
+)
+```
 
 
 
