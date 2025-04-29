@@ -237,7 +237,7 @@ summary(mod2_hpp)
 
 ```{r mod3}
 # Fit mixed effect model
-mod3_hpp <- lmer(Response ~ Pressure + Acid + Organism + (1 | Rep), data = hpp)
+mod3_hpp <- lmer(Response ~ Pressure + Acid + Organism + pH + (1 | Rep), data = hpp)
 summary(mod3_hpp)
 
 ```
@@ -343,7 +343,6 @@ print(paste("AIC for Model 1:", aic_model1))
 print(paste("AIC for Model 2:", aic_model2))
 print(paste("AIC for Model 3:", aic_model3))
 
-
 # Choose the best model based on AIC
 
 best_model <- list(mod1_hpp, mod2_hpp, mod3_hpp)[[which.min(c(aic_model1, aic_model2, aic_model3))]]
@@ -406,15 +405,6 @@ y = "Response",
 color = "Organism"
 )
 ```
-
-
-
-
-
-
-
-
-
 Make sure to run a model that reflects your study design. Even if your study design does not include one of the designs covered in class, you are still expected to run the most appropriate model. If you need help for references, let me know.  
 
 Before each chunk, describe the steps being performed in that chunk. For example, "Here I will load the data".  
