@@ -126,7 +126,7 @@ Here is where the coding is going to happen, and it will be completely up to you
 
 ```{r}
 install.packages("multcompView")
-#install.packages("lme4")
+install.packages("lme4")
 library(readxl) # for loading data
 library(tidyverse)     # For data manipulation and visualization
 library(ggplot2)       # For plotting (also in tidyverse)
@@ -140,6 +140,7 @@ library(lme4)
 library(multcompView)
 library(nlraa)
 library(janitor)
+library(ggpubr)
 
 
 ```
@@ -147,161 +148,163 @@ library(janitor)
 ##(b) Load and Inspect Data
 
 ```{r}
- hpp_data<- read_excel("../Data/Data_MD.xlsx")
+ hpp_data<- read_excel("../Data/HPP_all.xlsx")
 
 hpp_data
 
 ```
-##(c) EDA tables
 
-```{r glimpse}
-glimpse(hpp_data)
-summary(hpp_data)
-```
+  
 
-The d-values ranging from 0 to 15.221 seconds Mg/ha.  
+## (d) Data Wrangling
 
-##(d) Data Wrangling
-
-```{r hpp}
+```{r wrangling}
 hpp <- hpp_data %>%
-  mutate(
-    Rep = as.factor(Rep),
+ mutate(
+    Acid = as.factor(Acid),
     Organism = as.factor(Organism),
-    Acid = as.factor(Acid)
+    Replicate = as.factor(Replicate),
+    Pressure = as.factor(Pressure),
+    pH = as.factor(pH)
   )
-#Check for any missing values
-sum(is.na(hpp))
-
-# Preview cleaned data
-summary(hpp)
 ```
+The LogCFU/ml ranged from 11.396 to 2.398
 
-```{r }
+## (e) Exploratory Data Analysis (EDA)
+
+```{r EDA}
+# Summary stats
 summary(hpp)
+
+# Grouped summary
+hpp %>%
+  group_by(Organism, Pressure, pH, Acid) %>%
+  summarise(mean_log = mean(`LogCFU/ml`, na.rm = TRUE),
+            sd_log = sd(`LogCFU/ml`, na.rm = TRUE),
+            n = n(), .groups = "drop")
+
 ```
  
+## (f) EDA Plots
 
-
-
-```{r boxplot}
-
-ggplot(hpp, aes(x = factor(pH), y = Response, colour = Organism)) +
-geom_boxplot() +
-labs(title = "pH vs. D-value", x = "pH", y = "D-value") +
-theme_minimal()
-
-
-ggplot(hpp, aes(x = factor(Acid), y = Response, colour = Organism)) +
-geom_boxplot() +
-labs(title = "Acid vs. D-value", x = "Acid", y = "D-value") +
-theme_minimal()
-
-
-ggplot(hpp, aes(x = factor(Pressure), y = Response, colour = Organism)) +
-geom_boxplot() +
-labs(title = "Pressure vs. D-value", x = "Pressure", y = "D-value") +
-theme_minimal()
-
-
-```
-
-
-
-
-```{r interaction boxplot}
-# Create interaction plot
-ggplot(hpp, aes(x = factor(Pressure), y = Response, colour = Organism)) +
+```{r EDA plots}
+# Boxplot by Acid and Organism
+ggplot(hpp, aes(x = Acid, y = `LogCFU/ml`, colour = Acid)) +
   geom_boxplot() +
-  facet_grid(Acid ~ pH) +
-  labs(title = "Interaction Plot: Pressure, Acid, pH vs. D-value", x = "Pressure", y = "D-value") +
-  theme(legend.position = "none")+
-  theme_bw()
+  facet_grid(Pressure ~ pH + Organism) +
+  theme_minimal() +
+  
+  labs(title = "Log CFU/ml by Acid Type, Pressure, pH and Organism",
+       y = "Log CFU/ml")
 
 ```
 
-##(e) Modeling
-```{r mod1}
+##(g) Modeling
+```{r mod1 linear}
 
-mod1_hpp <- lm(Response ~ Pressure + pH + Organism + Acid + Rep, data = hpp)
-summary(mod1_hpp)
+mod1_lm <- lm(`LogCFU/ml` ~ Pressure * pH * Acid * Organism, data = hpp)
+
+summary(mod1_lm)
 
 ```
 
-```{r mod2}
-# Fit GLM (assuming Poisson distribution for example)
-mod2_hpp <- lm(Response ~ Pressure + pH + Organism + Acid, data = hpp, family = poisson())
-summary(mod2_hpp)
+```{r mod RSM}
+
+# Step 1: Prepare the data
+rsm_data <- hpp %>%
+  drop_na(`LogCFU/ml`, Pressure, pH) %>%
+  mutate(
+    LogCFU = `LogCFU/ml`,
+    Pressure_num = as.numeric(as.character(Pressure)),
+    pH_num = as.numeric(as.character(pH))
+  )
+
+# Step 2: Fit RSM model (2nd order polynomial)
+subset_data <- rsm_data 
+mod2_rsm<- lm(LogCFU ~ poly(Pressure_num, 2, raw = TRUE) +
+                        poly(pH_num, 2, raw = TRUE) +
+                        Pressure_num:pH_num,
+              data = subset_data)
+
+
+# Step 3: View summary
+summary(mod2_rsm)
+
 
 ```
 
 ```{r mod3}
 # Fit mixed effect model
-mod3_hpp <- lmer(Response ~ Pressure + Acid + Organism + pH + (1 | Rep), data = hpp)
-summary(mod3_hpp)
+mod3_mix <- lmer(`LogCFU/ml` ~ Pressure * pH * Acid * Organism + (1 | Replicate), data = hpp)
+
+summary(mod3_mix)
 
 ```
-##(f) Assumptions Checking
-```{r residual}
-#Residual Checks for Linear Model
-# Residual plots
 
-par(mar = c(2, 2, 2, 2))
-plot(mod1_hpp)
+##(h) Assumptions Checking
+
+
+```{r linear model}
+# Residual diagnostics
+par(mfrow = c(1, 1))
+plot(mod1_lm)
+
+# Normality test
+shapiro.test(residuals(mod1_lm))
+
+```
+
+```{r RSM}
+
+# Residual plots for Quadratic Model
+plot(mod2_rsm$fitted.values, resid(mod2_quad),
+     xlab = "Fitted Values", ylab = "Residuals",
+     main = "Residuals vs Fitted")
+abline(h = 0, col = "red")
+
 
 # QQ plot
-qqnorm(residuals(mod1_hpp))
-qqline(residuals(mod1_hpp))
+qqnorm(resid(mod2_rsm))
+qqline(resid(mod2_rsm), col = "blue")
+
 
 ```
 
-```{r residual glm}
-#Residual Checks for General Linear Model
-# Residual plots for GLM
-par(mar = c(2, 2, 2, 2))
-plot(mod2_hpp)
-
-# QQ plot
-qqnorm(residuals(mod2_hpp))
-qqline(residuals(mod2_hpp))
-
-```
 ```{r}
-#Residual Checks for Mixed Effect model
-#Residual Plots
+# Plot residuals
+par(mfrow = c(1, 1))
+plot(resid(mod3_mix), main = "Residuals")
 
-par(mar = c(2, 2, 2, 2))
-plot(mod3_hpp)
+# Q-Q plot for normality
+qqnorm(resid(mod3_mix))
+qqline(resid(mod3_mix))
 
-# QQ plot
-qqnorm(residuals(mod3_hpp))
-qqline(residuals(mod3_hpp))
 ```
 
 ##(g) ANOVA Table
 ```{r}
 #Anova for lm
 
-anova(mod1_hpp)
+anova(mod1_lm)
 ```
 
 ```{r}
 #Anova for glm
-anova(mod2_hpp, test = "Chisq")
+anova(mod2_rsm)
 
 ```
 
 ```{r}
 #Anova for mixed effects model
 
-anova(mod3_hpp)
+anova(mod3_mix)
 ```
  ##(h) Means and Pairwise Comparisons
 ```{r}
 #Means and Pairwise Comparisons for Linear Model
 
 # Estimated marginal means
-emmeans_mod1_hpp <- emmeans(mod1_hpp, ~ Acid + Organism)
+emmeans_mod1_hpp <- emmeans(mod1_lm, ~ Acid + Organism)
 summary(emmeans_mod1_hpp)
 
 # Pairwise comparisons
@@ -314,7 +317,7 @@ pairs(emmeans_mod1_hpp)
 #Means and Pairwise Comparisons for glm
 
 # Estimated marginal means
-emmeans_mod2_hpp <- emmeans(mod2_hpp, ~ Acid + Organism)
+emmeans_mod2_hpp <- emmeans(mod2_rsm, ~ Acid + Organism)
 summary(emmeans_mod2_hpp)
 
 # Pairwise comparisons
@@ -324,7 +327,7 @@ pairs(emmeans_mod2_hpp)
 ```{r}
 #Means and Pairwise Comparisons for mixed effect model
 # Estimated marginal means
-emmeans_mod3_hpp <- emmeans(mod3_hpp, ~ Acid + Organism)
+emmeans_mod3_hpp <- emmeans(mod3_mix, ~ Acid + Organism)
 summary(emmeans_mod3_hpp)
 
 # Pairwise comparisons
@@ -334,9 +337,9 @@ pairs(emmeans_mod3_hpp)
 ```{r AIC}
 
 # Calculate AIC for each model
-aic_model1 <- AIC(mod1_hpp)
-aic_model2 <- AIC(mod2_hpp)
-aic_model3 <- AIC(mod3_hpp)
+aic_model1 <- AIC(mod1_lm)
+aic_model2 <- AIC(mod2_rsm)
+aic_model3 <- AIC(mod3_mix)
 
 # Print AIC values
 print(paste("AIC for Model 1:", aic_model1))
@@ -345,66 +348,132 @@ print(paste("AIC for Model 3:", aic_model3))
 
 # Choose the best model based on AIC
 
-best_model <- list(mod1_hpp, mod2_hpp, mod3_hpp)[[which.min(c(aic_model1, aic_model2, aic_model3))]]
+best_model <- list(mod1_lm, mod2_quad, mod3_mix)[[which.min(c(aic_model1, aic_model2, aic_model3))]]
 summary(best_model)
 
 ```
 
 
 ```{r}
-# Residuals plot for the best model
-plot(best_model$fitted.values, best_model$residuals)
+# Residual vs Fitted plot
+plot(fitted(best_model), residuals(best_model),
+     xlab = "Fitted Values", ylab = "Residuals",
+     main = "Residuals vs Fitted")
 abline(h = 0, col = "red")
 
 # QQ plot for the best model
-qqPlot(best_model$residuals, main = "QQ Plot for Best Model")
+qqPlot(residuals(best_model), 
+       main = "QQ Plot for Best Model",
+       envelope = FALSE)
+
+
 
 ```
 
-```{r final plot}
 
-ggplot(hpp, aes(x = factor(pH), y = Response, colour = Organism)) +
+##(h) Final plots
+
+```{r plots}
+
+# Boxplot: LogCFU/ml by Pressure, colored by Acid
+
+  
+ggplot(hpp, aes(x = factor(Acid), y = `LogCFU/ml`, fill = Organism)) +
 geom_boxplot() +
-labs(title = "pH vs. D-value", x = "pH", y = "D-value") +
-theme_minimal()
+  facet_grid(~ Organism) +
+labs(title = "Acid vs. LogCFU/ml", x = "Acid", y = "Log CFU/ml") +
+  theme_bw()+
+  theme(
+    strip.text.x = element_text(size = 12),     # increase text size
+    strip.text = element_text(margin = margin(t = 6, b = 6)),  # more vertical margin
+    plot.title = element_text(hjust = 0.5),                    # center the title
+    panel.spacing = unit(1.5, "lines")                         # more spacing between facets
+  )
 
-
-ggplot(hpp, aes(x = factor(Acid), y = Response, colour = Organism)) +
+ggplot(hpp, aes(x = factor(pH), y = `LogCFU/ml`, colour = Organism)) +
+  facet_grid(~ Organism) +
 geom_boxplot() +
-labs(title = "Acid vs. D-value", x = "Acid", y = "D-value") +
-theme_minimal()
-
-
-ggplot(hpp, aes(x = factor(Pressure), y = Response, colour = Organism)) +
-geom_boxplot() +
-labs(title = "Pressure vs. D-value", x = "Pressure", y = "D-value") +
-theme_minimal()
-
-# Create interaction plot
-
-ggplot(hpp, aes(x = Pressure, y = Response, fill = Organism)) +
-geom_boxplot() +
- facet_grid(Acid ~ pH) +
+labs(title = "pH vs. LogCFU/ml", x = "pH", y = "D-value") +
 theme_bw() +
-theme(
-  legend.position = "none",
-strip.text = element_text(size = 7),
- axis.title = element_text(size = 7),
- axis.text = element_text(size = 6),
- legend.title = element_text(size = 6),
- legend.text = element_text(size = 5)
-) +
-  scale_x_continuous(
-limits = c(500, 700), # Set the limits for the x-axis
-breaks = seq(500, 700, by = 100) # Set the breaks for the x-axis
-) +
-labs(
- title = "Interaction Plot: Pressure, Acid, pH vs. Response",
-x = "Pressure",
-y = "Response",
-color = "Organism"
-)
+  theme(
+    strip.text.x = element_text(size = 12, face = "bold"),     # increase text size
+    strip.text = element_text(margin = margin(t = 6, b = 6)),  # more vertical margin
+    plot.title = element_text(hjust = 0.5),                    # center the title
+    panel.spacing = unit(1.5, "lines")                         # more spacing between facets
+  )
+
 ```
+
+```{r final plots}
+library(ggplot2)
+hpp$Pressure <- as.factor(hpp$Pressure)
+
+ggplot(hpp, aes(x = factor(Pressure), y = `LogCFU/ml`, fill = Organism)) +
+  geom_boxplot(
+    outlier.shape = NA,      # removes outliers
+    width = 0.8,             # increase box width
+    size = 0.2               # thicker lines
+  ) +
+  facet_wrap(~ pH + Acid, ncol = 3) +
+  facet_grid(pH ~ Acid, scales = "fixed") +  # fixed scales keeps common y-axis
+  labs(
+    title = "LogCFU/ml by Pressure, Acid, Organism",
+    x = "Pressure (MPa)",
+    y = "LogCFU/ml"
+  ) +
+  
+  theme_bw() +
+  theme(
+    legend.position = "none",
+    strip.text = element_text(size = 5),
+    axis.title = element_text(size = 9),
+    axis.text = element_text(size = 7),
+    plot.title = element_text(size = 10, hjust = 0.5, face = "italic"),
+    panel.spacing = unit(1.5, "lines"),
+    plot.margin = margin(10, 20, 10, 20)
+  ) +
+  scale_y_continuous(limits = c(2, 12), breaks = seq(2, 12, 2)) +
+  scale_fill_manual(values = c("E. coli" = "pink", "Listeria monocytogenes" = "purple"))
+
+
+```
+```{r}
+summary_df <- hpp %>%
+  group_by(Pressure, pH, Acid, Organism) %>%
+  summarise(
+    mean_log = mean(`LogCFU/ml`, na.rm = TRUE),
+    sd_log = sd(`LogCFU/ml`, na.rm = TRUE),
+    .groups = 'drop'
+  )
+library(ggplot2)
+
+ggplot(summary_df, aes(x = factor(Pressure), y = mean_log, fill = Organism)) +
+  geom_col(position = position_dodge(0.6), width = 0.6) +
+  geom_errorbar(
+    aes(ymin = mean_log - sd_log, ymax = mean_log + sd_log),
+    width = 0.1,
+    position = position_dodge(0.8)
+  ) +
+  facet_grid(pH ~ Acid, scale = "fixed") +
+  scale_fill_manual(values = c("blue", "turquoise")) +
+  labs(
+    title = "Mean LogCFU/ml ± SD by Pressure, Acid, pH, and Organism",
+    x = "Pressure (MPa)",
+    y = "LogCFU/ml"
+  ) +
+  theme_bw(base_size = 10) +
+  theme(
+    plot.title = element_text(hjust = 0.6, face = "italic"),
+    strip.text = element_text(size =8),
+    axis.text = element_text(size = 8),
+    legend.title = element_blank(),
+    panel.spacing = unit(1.5, "lines"),
+    legend.position = "none"
+  )
+
+```
+
+
 Make sure to run a model that reflects your study design. Even if your study design does not include one of the designs covered in class, you are still expected to run the most appropriate model. If you need help for references, let me know.  
 
 Before each chunk, describe the steps being performed in that chunk. For example, "Here I will load the data".  
